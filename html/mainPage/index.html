@@ -66,41 +66,53 @@
     </div> -->
 
     <div class="tabcontent tabcontent-topmenu fullpage" id="Filtering">
-        <h3>Filtering</h3>
-        Tick the box to show packets
+        <div id="filtering-container">
+            <div id="filtering-left">
+                <h3>Filtering</h3>
+                Tick the box to show packets
 
-        <div id="mainPresets">
-            <button onclick="showAllPackets()" style="margin-left: 16px;">Show all
-            </button>
+                <div id="mainPresets">
+                    <button onclick="showAllPackets()" style="margin-left: 16px;">Show all
+                    </button>
 
-            <!-- TODO: More dynamic and clean method of doing this -->
-            <button onclick="sharedVars.hiddenPackets = {
-            serverbound: [...allServerboundPackets], clientbound: [...allClientboundPackets]
-          }
-          updateFilteringTab()" style="margin-left: 8px;">Hide all
-            </button>
+                    <!-- TODO: More dynamic and clean method of doing this -->
+                    <button onclick="sharedVars.hiddenPackets = {
+                    serverbound: [...allServerboundPackets], clientbound: [...allClientboundPackets]
+                  }
+                  updateFilteringTab()" style="margin-left: 8px;">Hide all
+                    </button>
 
-            <button onclick="const defaultHidden = findDefault('hiddenPackets')
-          sharedVars.hiddenPackets = {
-            serverbound: [...defaultHidden.serverbound], clientbound: [...defaultHidden.clientbound]
-          }
-          updateFilteringTab()" style="margin-left: 8px;">Defaults
-            </button>
-        </div>
-        <div id="extendedPresets">
-        </div>
-        <div id="customPresetsSection">
-          <div id="customPresets"></div>
-          <span id="savePresetControls">
-            <input type="text" id="presetNameInput" placeholder="Preset name" maxlength="30">
-            <button id="savePresetBtn">Save preset</button>
-          </span>
-        </div>
-        <br><br>
-        <div class="box" style="height: calc(100% - 118px);">
-            <ul class="packetlist" id="filtering-packets">
+                    <button onclick="const defaultHidden = findDefault('hiddenPackets')
+                  sharedVars.hiddenPackets = {
+                    serverbound: [...defaultHidden.serverbound], clientbound: [...defaultHidden.clientbound]
+                  }
+                  updateFilteringTab()" style="margin-left: 8px;">Defaults
+                    </button>
+                </div>
+                <div id="extendedPresets">
+                </div>
+                <div id="customPresetsSection">
+                  <div id="customPresets"></div>
+                  <span id="savePresetControls">
+                    <input type="text" id="presetNameInput" placeholder="Preset name" maxlength="30">
+                    <button id="savePresetBtn">Save preset</button>
+                  </span>
+                </div>
+                <div id="filteringSearchSection">
+                  <input type="text" id="filteringSearch" placeholder="Search packets..." oninput="filterFilteringPackets()">
+                </div>
+                <div class="box" style="height: calc(100% - 130px);">
+                    <ul class="packetlist" id="filtering-packets">
 
-            </ul>
+                    </ul>
+                </div>
+            </div>
+            <div id="filtering-right">
+                <h3>Top Packets <span class="time-window-label">(every 30s)</span></h3>
+                <div class="box" id="top-packets-box">
+                    <ul id="top-packets-list"></ul>
+                </div>
+            </div>
         </div>
     </div>
 

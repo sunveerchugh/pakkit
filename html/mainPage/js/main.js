@@ -4,6 +4,9 @@ const Store = require('electron-store');
 
 const axios = require('axios')
 
+const TOP_PACKETS_LIMIT = 20
+const TOP_PACKETS_INTERVAL_MS = 30000
+
 const Clusterize = require('clusterize.js')
 const filteringLogic = require('./js/filteringLogic.js')
 
@@ -243,6 +246,135 @@ function updateFilteringStorage () {
   setVersionSpecificVar('hiddenPackets', sharedVars.hiddenPackets)
 }
 
+// Cached top packets - recalculated every 30 seconds
+let cachedTopPackets = []
+let lastSnapshotIndex = 0
+
+function recalculateTopPackets (limit = TOP_PACKETS_LIMIT) {
+  const counts = { serverbound: {}, clientbound: {} }
+
+  // Safety check: reset if array shrunk (e.g., after loading a log file)
+  if (lastSnapshotIndex > sharedVars.allPackets.length) {
+    lastSnapshotIndex = 0
+  }
+
+  // Count packets since last snapshot
+  for (let i = lastSnapshotIndex; i < sharedVars.allPackets.length; i++) {
+    const packet = sharedVars.allPackets[i]
+    const direction = packet.direction
+    const name = packet.meta.name
+    counts[direction][name] = (counts[direction][name] || 0) + 1
+  }
+
+  // Update snapshot index for next interval
+  lastSnapshotIndex = sharedVars.allPackets.length
+
+  const result = []
+  for (const direction of ['serverbound', 'clientbound']) {
+    for (const name in counts[direction]) {
+      result.push({
+        direction,
+        name,
+        count: counts[direction][name]
+      })
+    }
+  }
+  // Sort by count descending, then alphabetically by name for stability
+  result.sort((a, b) => {
+    if (b.count !== a.count) {
+      return b.count - a.count
+    }
+    return a.name.localeCompare(b.name)
+  })
+  cachedTopPackets = result.slice(0, limit)
+  rebuildTopPacketsDisplay()
+}
+
+function rebuildTopPacketsDisplay () {
+  const topPacketsList = document.getElementById('top-packets-list')
+  if (!topPacketsList) return
+
+  topPacketsList.innerHTML = ''
+  for (const packet of cachedTopPackets) {
+    const isMuted = sharedVars.hiddenPackets[packet.direction].includes(packet.name)
+    const li = document.createElement('li')
+    li.id = 'top-packet-' + packet.direction + '-' + packet.name
+    li.className = 'top-packet-item ' + packet.direction
+
+    const checkbox = document.createElement('input')
+    checkbox.type = 'checkbox'
+    checkbox.checked = !isMuted
+    const dir = packet.direction
+    const name = packet.name
+    checkbox.onchange = function () {
+      toggleTopPacketVisibility(dir, name, this.checked)
+    }
+
+    const nameSpan = document.createElement('span')
+    nameSpan.className = 'top-packet-name' + (isMuted ? ' muted' : '')
+    nameSpan.textContent = packet.name
+
+    const countSpan = document.createElement('span')
+    countSpan.className = 'top-packet-count'
+    countSpan.textContent = packet.count.toLocaleString()
+
+    li.appendChild(checkbox)
+    li.appendChild(nameSpan)
+    li.appendChild(countSpan)
+    topPacketsList.appendChild(li)
+  }
+}
+
+function toggleTopPacketVisibility (direction, name, show) {
+  const index = sharedVars.hiddenPackets[direction].indexOf(name)
+  if (show && index !== -1) {
+    // Remove from hidden
+    sharedVars.hiddenPackets[direction].splice(index, 1)
+  } else if (!show && index === -1) {
+    // Add to hidden
+    sharedVars.hiddenPackets[direction].push(name)
+  }
+  // Update checkbox in filtering list (left side)
+  const packetElement = document.getElementById(name + '-' + direction)
+  if (packetElement && packetElement.firstElementChild) {
+    const checkbox = packetElement.firstElementChild.firstElementChild
+    if (checkbox) {
+      checkbox.checked = show
+    }
+  }
+  // Update the name span style in top packets list (right side)
+  const topPacketElement = document.getElementById('top-packet-' + direction + '-' + name)
+  if (topPacketElement) {
+    const nameSpan = topPacketElement.querySelector('.top-packet-name')
+    if (nameSpan) {
+      nameSpan.className = 'top-packet-name' + (show ? '' : ' muted')
+    }
+  }
+  updateFiltering()
+  updateFilteringStorage()
+}
+
+function mutePacketType (direction, name) {
+  console.log('mutePacketType called:', direction, name)
+  if (sharedVars.hiddenPackets[direction].indexOf(name) === -1) {
+    sharedVars.hiddenPackets[direction].push(name)
+    console.log('Added to hiddenPackets:', sharedVars.hiddenPackets[direction])
+  }
+  const packetElement = document.getElementById(name + '-' + direction)
+  if (packetElement && packetElement.firstElementChild) {
+    const checkbox = packetElement.firstElementChild.firstElementChild
+    if (checkbox) {
+      checkbox.checked = false
+      checkbox.readOnly = false
+      checkbox.indeterminate = false
+    }
+  }
+  deselectPacket()
+  updateFiltering()
+  updateFilteringStorage()
+}
+window.mutePacketType = mutePacketType
+
 window.updateFilteringTab = function updateFilteringTab () {
   for (const item of filteringPackets.children) {
     const name = item.children[0].children[2].textContent
@@ -297,6 +429,25 @@ window.updateFilteringPackets = () => {
 
 window.updateFilteringPackets()
 
+window.filterFilteringPackets = function () {
+  const searchInput = document.getElementById('filteringSearch')
+  const searchTerm = searchInput.value.toLowerCase()
+  const packets = filteringPackets.children
+
+  for (const packet of packets) {
+    const nameSpan = packet.querySelector('.name')
+    const idSpan = packet.querySelector('.id')
+    const name = nameSpan ? nameSpan.textContent.toLowerCase() : ''
+    const id = idSpan ? idSpan.textContent.toLowerCase() : ''
+
+    if (name.includes(searchTerm) || id.includes(searchTerm)) {
+      packet.style.display = ''
+    } else {
+      packet.style.display = 'none'
+    }
+  }
+}
+
 // Update every 0.05 seconds
 // TODO: Find a better way without updating on every packet (which causes lag)
 window.setInterval(function () {
@@ -314,6 +465,11 @@ window.setInterval(function () {
     sharedVars.packetsUpdated = false
   }
 }, 50)
+
+// Update top packets every 30 seconds
+window.setInterval(recalculateTopPackets, TOP_PACKETS_INTERVAL_MS)
+// Initial calculation after a short delay to let packets accumulate
+setTimeout(recalculateTopPackets, 1000)
 
 window.closeDialog = function () { // window. stops standardjs from complaining
   // dialogOpen = false
@@ -432,6 +588,10 @@ window.clearPackets = function () { // window. stops standardjs from complaining
   sharedVars.packetsUpdated = true
   // TODO: Doesn't seem to work? When removing line above it doesn't do anything until the next packet
   wrappedClusterizeUpdate([])
+  // Reset top packets tracking
+  lastSnapshotIndex = 0
+  cachedTopPackets = []
+  rebuildTopPacketsDisplay()
 }
 
 window.showAllPackets = function () { // window. stops standardjs from complaining
@@ -497,19 +657,7 @@ window.packetClick = function (id) { // window. stops standardjs from complainin
 
 function hideAll (id) {
   const packet = sharedVars.allPackets[id]
-  if (sharedVars.hiddenPackets[packet.direction].indexOf(packet.meta.name) === -1) {
-    sharedVars.hiddenPackets[packet.direction].push(packet.meta.name)
-  }
-  const packetElement = document.getElementById(packet.meta.name + '-' + packet.direction)
-  if (packetElement) {
-    const checkbox = packetElement.firstElementChild
-    checkbox.checked = false
-    checkbox.readOnly = false
-    checkbox.indeterminate = false
-  }
-  deselectPacket()
-  updateFiltering()
-  updateFilteringStorage()
+  mutePacketType(packet.direction, packet.meta.name)
 }
 
 sharedVars.ipcRenderer.on('hideAllOfType', (event, arg) => { // Context menu
