@@ -143,6 +143,12 @@ function setVersionSpecificVar(name, value) {
   sharedVars.store.set(versionId, settingsObject)
 }
 
+// Expose for presets module
+const storageHelpers = {
+  getVersionSpecificVar,
+  setVersionSpecificVar
+}
+
 const defaultsJson = require('./js/defaults.json')
 
 function findDefault(setting) {
@@ -223,6 +229,8 @@ sharedVars.settings.bindToSettingChange('regexFilter', (newValue) => {
   } catch (e) {}
 })
 sharedVars.settings.setup(sharedVars)
+sharedVars.presets = require('./js/presets.js')
+sharedVars.presets.setup(sharedVars, storageHelpers)
 
 
 
@@ -235,7 +243,7 @@ function updateFilteringStorage () {
   setVersionSpecificVar('hiddenPackets', sharedVars.hiddenPackets)
 }
 
-function updateFilteringTab () {
+window.updateFilteringTab = function updateFilteringTab () {
   for (const item of filteringPackets.children) {
     const name = item.children[0].children[2].textContent
     //console.log(name);

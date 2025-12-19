@@ -286,6 +286,38 @@ div.error {
   display: contents;
 }
 
+#customPresetsSection {
+  display: contents;
+}
+
+#customPresets {
+  display: contents;
+}
+
+#savePresetControls {
+  margin-left: 16px;
+}
+
+#presetNameInput {
+  width: 140px;
+  margin-right: 4px;
+}
+
+.custom-preset-btn {
+  position: relative;
+}
+
+.preset-delete-btn {
+  margin-left: 6px;
+  padding: 0 4px;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+}
+
+.preset-delete-btn:hover {
+  color: #ff6b6b;
+}
+
 .error-dialog {
   user-select: text;
 }
