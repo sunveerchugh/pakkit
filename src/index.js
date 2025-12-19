@@ -19,7 +19,6 @@ if (options.autostart) {
 }
 
 const {app, BrowserWindow, ipcMain, clipboard, Menu, dialog, shell } = require('electron')
-app.allowRendererProcessReuse = true
 
 const fs = require('fs')
 const Store = require('electron-store')
@@ -65,7 +64,7 @@ function makeMenu(direction, text, id, invalid, noData) {
         {
             label: 'Edit and resend',
             click: () => {
-                BrowserWindow.getAllWindows()[0].send('editAndResend', JSON.stringify({
+                BrowserWindow.getAllWindows()[0].webContents.send('editAndResend', JSON.stringify({
                     id: id
                 }))
             },
@@ -74,7 +73,7 @@ function makeMenu(direction, text, id, invalid, noData) {
         {
             label: 'Hide all packets of this type',
             click: () => {
-                BrowserWindow.getAllWindows()[0].send('hideAllOfType', JSON.stringify({
+                BrowserWindow.getAllWindows()[0].webContents.send('hideAllOfType', JSON.stringify({
                     // Packet ID from link URL
                     id: id
                 }))
@@ -87,7 +86,7 @@ function makeMenu(direction, text, id, invalid, noData) {
           {
               label: proxy.capabilities.jsonData ? 'Copy JSON data' : 'Copy data',
               click: () => {
-                  BrowserWindow.getAllWindows()[0].send('copyPacketData', JSON.stringify({
+                  BrowserWindow.getAllWindows()[0].webContents.send('copyPacketData', JSON.stringify({
                       id: id
                   }))
               }
@@ -100,7 +99,7 @@ function makeMenu(direction, text, id, invalid, noData) {
           {
               label: 'Copy teleport as command',
               click: () => {
-                  BrowserWindow.getAllWindows()[0].send('copyTeleportCommand', JSON.stringify({
+                  BrowserWindow.getAllWindows()[0].webContents.send('copyTeleportCommand', JSON.stringify({
                       id: id
                   }))
               }
@@ -113,7 +112,7 @@ function makeMenu(direction, text, id, invalid, noData) {
           {
               label: 'Copy hex data',
               click: () => {
-                  BrowserWindow.getAllWindows()[0].send('copyHexData', JSON.stringify({
+                  BrowserWindow.getAllWindows()[0].webContents.send('copyHexData', JSON.stringify({
                       id: id
                   }))
               }
@@ -137,8 +136,7 @@ function createWindow() {
         // frame: false,
         webPreferences: {
             nodeIntegration: true,
-            contextIsolation: false,
-            enableRemoteModule: true
+            contextIsolation: false
         },
         icon: resourcesPath + 'icons/icon.png'
     })
@@ -148,7 +146,7 @@ function createWindow() {
     // Open the DevTools.
     // win.webContents.openDevTools()
     electronLocalShortcut.register(win, 'F12', () => {
-        win.openDevTools()
+        win.webContents.openDevTools()
     })
 
     win.webContents.setWindowOpenHandler(function(details) {
@@ -158,7 +156,7 @@ function createWindow() {
 
     unhandled({
         logger: (err) => {
-            win.send('error', JSON.stringify({msg: err.message, stack: err.stack}))
+            win.webContents.send('error', JSON.stringify({msg: err.message, stack: err.stack}))
             console.log(err.stack)
             console.error(err)
         },
@@ -215,7 +213,7 @@ ipcMain.on('startProxy', (event, arg) => {
 
 function showAuthCode (data) {
     const win = BrowserWindow.getAllWindows()[0]
-    win.send('showAuthCode', JSON.stringify(data))
+    win.webContents.send('showAuthCode', JSON.stringify(data))
 }
 
 function startProxy (args) {
@@ -230,7 +228,7 @@ function startProxy (args) {
     packetHandler.init(BrowserWindow.getAllWindows()[0], ipcMain, proxy)
     proxy.startProxy(args.connectAddress, args.connectPort, args.listenPort, args.version, args.onlineMode,
       args.consent, packetHandler.packetHandler, packetHandler.messageHandler , dataFolder, () => {
-          win.send('updateFiltering', '')
+          win.webContents.send('updateFiltering', '')
       }, showAuthCode)
 
     win.loadFile('html/mainPage/index.html')
@@ -303,7 +301,7 @@ ipcMain.on('loadLog', async (event, arg) => {
         fs.readFile(result.filePaths[0], 'utf-8', function(err, data) {
             if (err) throw err;
             console.log('File has been read')
-            win.send('loadLogData', data)
+            win.webContents.send('loadLogData', data)
         })
     }
 })
@@ -320,13 +318,13 @@ ipcMain.on('saveAsScript', async (event, arg) => {
 
     if (!result.canceled) {
         const realPath = result.filePath.endsWith('.js') ? result.filePath : result.filePath + '.js'
-        win.send('disableBtnScriptSave')
+        win.webContents.send('disableBtnScriptSave')
         console.log('Saving script to', realPath)
         fs.writeFile(realPath, arg, function (err) {
             if (err) throw err;
             console.log('Saved!');
             currentScriptFile = realPath
-            win.send('enableBtnScriptSave', currentScriptFile)
+            win.webContents.send('enableBtnScriptSave', currentScriptFile)
         })
     }
 })
@@ -335,14 +333,14 @@ ipcMain.on('saveScript', async (event, arg) => {
     const win = BrowserWindow.getAllWindows()[0]
     const validScriptPath = (currentScriptFile != null || fs.existsSync(currentScriptFile) )
 
-    win.send('disableBtnScriptSave')
+    win.webContents.send('disableBtnScriptSave')
 
     if (validScriptPath) {
         console.log('Overwrite script to', currentScriptFile)
         fs.writeFile(currentScriptFile, arg, function (err) {
             if (err) throw err;
             console.log('Saved!');
-            win.send('enableBtnScriptSave', currentScriptFile)
+            win.webContents.send('enableBtnScriptSave', currentScriptFile)
         })
     }
 })
@@ -359,7 +357,7 @@ ipcMain.on('loadScript', async (event, arg) => {
     })
 
     if (!result.canceled) {
-        win.send('disableBtnScriptSave')
+        win.webContents.send('disableBtnScriptSave')
 
         // It's an array, but we have multi-select off so it should only have one item
         console.log('Loading script from', result.filePaths[0])
@@ -367,8 +365,8 @@ ipcMain.on('loadScript', async (event, arg) => {
             if (err) throw err;
             console.log('File has been read')
             currentScriptFile = result.filePaths[0]
-            win.send('loadScriptData', data)
-            win.send('enableBtnScriptSave', currentScriptFile)
+            win.webContents.send('loadScriptData', data)
+            win.webContents.send('enableBtnScriptSave', currentScriptFile)
         })
     }
 })

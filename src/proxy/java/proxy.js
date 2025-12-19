@@ -191,14 +191,13 @@ exports.startProxy = function (host, port, listenPort, version, onlineMode, auth
             }
           }
         }
-        const bufferEqual = require('buffer-equal')
         targetClient.on('packet', function (data, meta, buffer, fullBuffer) {
           if (client.state !== states.PLAY || meta.state !== states.PLAY) { return }
 
           let packetValid = false
           try {
             const packetBuff = client.serializer.createPacketBuffer({ name: meta.name, params: data })
-            if (!bufferEqual(fullBuffer, packetBuff)) {
+            if (!fullBuffer.equals(packetBuff)) {
               console.log('client<-server: Error in packet ' + meta.state + '.' + meta.name)
               console.log('received buffer', fullBuffer.toString('hex'))
               console.log('produced buffer', packetBuff.toString('hex'))
@@ -225,7 +224,7 @@ exports.startProxy = function (host, port, listenPort, version, onlineMode, auth
           let packetValid = false
           try {
             const packetBuff = targetClient.serializer.createPacketBuffer({ name: meta.name, params: packetData })
-            if (!bufferEqual(fullBuffer, packetBuff)) {
+            if (!fullBuffer.equals(packetBuff)) {
               console.log('client->server: Error in packet ' + meta.state + '.' + meta.name)
               console.log('received buffer', fullBuffer.toString('hex'))
               console.log('produced buffer', packetBuff.toString('hex'))
